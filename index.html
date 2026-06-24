@@ -371,3 +371,16 @@
             status: status,
             points: points,
             timestamp: new Date().toISOString()
+        }).then(() => {
+            alert(`🎉 雲端填報成功！\n【${selectedClass}】累計積分 +${points}！`);
+            document.getElementById('wasteForm').reset();
+            document.querySelectorAll('.status-btn').forEach(btn => btn.classList.remove('active'));
+            document.getElementById('wasteStatus').value = '';
+        }).catch((error) => {
+            alert("儲存失敗，請檢查網路或 Firebase 安全規則設定！" + error);
+        });
+    });
+</script>
+
+</body>
+</html>
