@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>學校午餐惜食智慧儀表板</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    
+    <style>
+        :root {
+            --primary: #2d6a4f;
+            --primary-light: #d8f3dc;
+            --accent: #ff9f1c;
+            --green-btn: #4caf50;
+            --yellow-btn: #fbc02d;
+            --red-btn: #e57373;
+            --bg: #f4f9f4;
+        }
+
+        body {
+            font-family: 'PingFang TC', 'Microsoft JhengHei', sans-serif;
+            background-color: var(--bg);
+            margin: 0;
+            padding: 20px;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 20px;
+        }
+
+        @media (min-width: 900px) {
+            .container {
+                grid-template-columns: 450px 1fr;
+            }
+            .header-banner { grid-column: 1 / -1; }
+        }
+
+        .header-banner {
+            background-color: var(--primary);
+            color: white;
+            padding: 20px;
+            border-radius: 15px;
+            text-align: center;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .header-banner h1 { margin: 0; font-size: 2.2rem; }
+        .header-banner p { margin: 5px 0 0 0; opacity: 0.9; }
+
+        .card {
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+        }
+
+        .card h2 {
+            margin-top: 0;
+            color: var(--primary);
+            border-bottom: 3px solid var(--primary-light);
+            padding-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .form-group { margin-bottom: 20px; }
+        label { display: block; font-weight: bold; margin-bottom: 8px; font-size: 1.1rem; }
+        select {
+            width: 100%;
+            padding: 12px;
+            font-size: 1.1rem;
+            border-radius: 8px;
+            border: 2px solid #ccc;
+            background-color: #fff;
+        }
+
+        .status-options {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .status-btn {
+            padding: 15px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            border: 3px solid #eee;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .btn-g { background-color: #e8f5e9; color: #2e7d32; border-color: #c8e6c9; }
+        .btn-g.active { background-color: var(--green-btn); color: white; border-color: #388e3c; }
+        .btn-y { background-color: #fffde7; color: #f57f17; border-color: #fff9c4; }
+        .btn-y.active { background-color: var(--yellow-btn); color: white; border-color: #fbc02d; }
+        .btn-r { background-color: #ffebee; color: #c62828; border-color: #ffcdd2; }
+        .btn-r.active { background-color: var(--red-btn); color: white; border-color: #d32f2f; }
+        
+        .score-badge { background: rgba(0,0,0,0.1); padding: 3px 8px; border-radius: 5px; font-size: 0.9rem; }
+
+        .submit-btn {
+            width: 100%;
+            padding: 15px;
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.3rem;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 15px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .submit-btn:hover { filter: brightness(1.2); }
+
+        .leaderboard-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-top: 15px;
+        }
+        .leaderboard-item {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            background: #f9f9f9;
+            padding: 12px 15px;
+            border-radius: 8px;
+            border-left: 5px solid #ccc;
+        }
+        .leaderboard-item.rank-1 { border-left-color: #ffd700; background: #fffdf0; }
+        .leaderboard-item.rank-2 { border-left-color: #c0c0c0; background: #f5f5f5; }
+        .leaderboard-item.rank-3 { border-left-color: #cd7f32; background: #faf0e6; }
+
+        .rank-number {
+            font-size: 1.3rem;
+            font-weight: bold;
+            width: 30px;
+            text-align: center;
+        }
+        
+        .class-name { flex-grow: 1; font-weight: bold; font-size: 1.1rem; }
+        
+        .progress-bar-container {
+            width: 40%;
+            background: #eee;
+            height: 16px;
+            border-radius: 8px;
+            overflow: hidden;
+            margin-right: 15px;
+        }
+        .progress-bar {
+            height: 100%;
+            background: var(--primary);
+            width: 0%;
+            transition: width 0.5s ease;
+        }
+
+        .score-value {
+            font-weight: bold;
+            color: var(--primary);
+            font-size: 1.1rem;
+            width: 80px;
+            text-align: right;
+        }
+
+        .dashboard-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .chart-box {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 250px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    
+    <div class="header-banner">
+        <h1><i class="fa-solid fa-utensils"></i> 學校午餐惜食智慧儀表板</h1>
+        <p>【雲端互聯版】跨電腦同步連線系統已啟動</p>
+    </div>
+
+    <div class="card">
+        <h2><i class="fa-solid fa-pen-to-square"></i> 班級午餐回報區</h2>
+        <form id="wasteForm">
+            <div class="form-group">
+                <label for="classSelect">1. 選擇你的班級</label>
+                <select id="classSelect" required>
+                    <option value="">-- 請選擇 --</option>
+                    <option value="一年一班">一年一班</option>
+                    <option value="一年二班">一年二班</option>
+                    <option value="二年一班">二年一班</option>
+                    <option value="二年二班">二年二班</option>
+                    <option value="三年一班">三年一班</option>
+                    <option value="三年二班">三年二班</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>2. 今天班上的剩食狀況</label>
+                <div class="status-options">
+                    <div class="status-btn btn-g" onclick="setWasteStatus('吃完', this)">
+                        <span>🟢 全部吃光光（光盤！）</span>
+                        <span class="score-badge">+10 分</span>
+                    </div>
+                    <div class="status-btn btn-y" onclick="setWasteStatus('吃一半', this)">
+                        <span>🟡 還剩大約一半（再加油！）</span>
+                        <span class="score-badge">+5 分</span>
+                    </div>
+                    <div class="status-btn btn-r" onclick="setWasteStatus('沒吃', this)">
+                        <span>🔴 剩好多沒吃（太浪費了...）</span>
+                        <span class="score-badge">+0 分</span>
+                    </div>
+                </div>
+                <input type="hidden" id="wasteStatus" required>
+            </div>
+
+            <button type="submit" class="submit-btn">送出今日紀錄 <i class="fa-solid fa-paper-plane"></i></button>
+        </form>
+    </div>
+
+    <div class="dashboard-grid">
+        
+        <div class="card">
+            <h2><i class="fa-solid fa-chart-pie"></i> 今日全校午餐剩食概況</h2>
+            <div class="chart-box">
+                <canvas id="schoolPieChart"></canvas>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2><i class="fa-solid fa-trophy" style="color: var(--accent);"></i> 惜食榮譽霸主排行榜（累計總積分）</h2>
+            <div class="leaderboard-list" id="leaderboard">
+                </div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+    // 【自動填入】設定您的 Firebase 即時資料庫網址
+    const firebaseConfig = {
+        databaseURL: "https://niceshann-d151a-default-rtdb.firebaseio.com"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    // 初始化本機變數
+    let scores = { "一年一班": 0, "一年二班": 0, "二年一班": 0, "二年二班": 0, "三年一班": 0, "三年二班": 0 };
+    let stats = { '吃完': 0, '吃一半': 0, '沒吃': 0 };
+
+    // 初始化 Chart.js 圓餅圖
+    const ctx = document.getElementById('schoolPieChart').getContext('2d');
+    const schoolPieChart = new Chart(ctx, {
+        type: 'pie',
+        data: {
+            labels: ['🟢 全部吃光', '🟡 剩下一半', '🔴 幾乎沒吃'],
+            datasets: [{
+                data: [0, 0, 0],
+                backgroundColor: ['#4caf50', '#fbc02d', '#e57373']
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { position: 'right' } }
+        }
+    });
+
+    // 處理填報按鈕點擊效果
+    function setWasteStatus(value, element) {
+        document.querySelectorAll('.status-btn').forEach(btn => btn.classList.remove('active'));
+        element.classList.add('active');
+        document.getElementById('wasteStatus').value = value;
+    }
+
+    // 重新渲染排行榜
+    function renderLeaderboard() {
+        const leaderboardEl = document.getElementById('leaderboard');
+        leaderboardEl.innerHTML = '';
+
+        const sortedClasses = Object.entries(scores).sort((a, b) => b[1] - a[1]);
+        const maxScore = Math.max(...Object.values(scores), 1);
+
+        sortedClasses.forEach(([className, score], index) => {
+            const rank = index + 1;
+            let rankClass = '';
+            let medal = `${rank}`;
+            
+            if (rank === 1) { rankClass = 'rank-1'; medal = '🥇'; }
+            else if (rank === 2) { rankClass = 'rank-2'; medal = '🥈'; }
+            else if (rank === 3) { rankClass = 'rank-3'; medal = '🥉'; }
+
+            const percentage = (score / maxScore) * 100;
+
+            const itemHTML = `
+                <div class="leaderboard-item ${rankClass}">
+                    <div class="rank-number">${medal}</div>
+                    <div class="class-name">${className}</div>
+                    <div class="progress-bar-container">
+                        <div class="progress-bar" style="width: ${percentage}%"></div>
+                    </div>
+                    <div class="score-value">${score} 分</div>
+                </div>
+            `;
+            leaderboardEl.innerHTML += itemHTML;
+        });
+    }
+
+    // 【核心改變】監聽雲端資料庫，只要有人填報，全校圖表 0.5 秒內同步跳動
+    db.ref('lunch_records').on('value', (snapshot) => {
+        // 重置統計
+        scores = { "一年一班": 0, "一年二班": 0, "二年一班": 0, "二年二班": 0, "三年一班": 0, "三年二班": 0 };
+        stats = { '吃完': 0, '吃一半': 0, '沒吃': 0 };
+
+        if (snapshot.exists()) {
+            const data = snapshot.val();
+            Object.values(data).forEach(record => {
+                if(scores[record.className] !== undefined) {
+                    scores[record.className] += record.points;
+                }
+                if(stats[record.status] !== undefined) {
+                    stats[record.status]++;
+                }
+            });
+        }
+
+        // 即時連動更新前端畫面
+        schoolPieChart.data.datasets[0].data = [stats['吃完'], stats['吃一半'], stats['沒吃']];
+        schoolPieChart.update();
+        renderLeaderboard();
+    });
+
+    // 表單提交事件（直接往雲端推送）
+    document.getElementById('wasteForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const selectedClass = document.getElementById('classSelect').value;
+        const status = document.getElementById('wasteStatus').value;
+
+        if (!selectedClass || !status) {
+            alert('請選取班級和今日的剩食狀況喔！');
+            return;
+        }
+
+        let points = 0;
+        if (status === '吃完') points = 10;
+        else if (status === '吃一半') points = 5;
+        else if (status === '沒吃') points = 0;
+
+        // 【新增】直接推送到雲端倉庫
+        db.ref('lunch_records').push({
+            className: selectedClass,
+            status: status,
+            points: points,
+            timestamp: new Date().toISOString()
